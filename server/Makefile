@@ -1,0 +1,3 @@
+game_server: *.h *.cpp Makefile
+	g++ -g -Wall -Wextra -pedantic *.cpp -std=c++0x -pthread -o game_server -O2
+#	g++ -g -Wall -Wextra -Werror -pedantic *.cpp -std=c++0x -pthread -o game_server -O2

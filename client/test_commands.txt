@@ -1,0 +1,35 @@
+
+Commands from client1:
+
+name player1
+=> ok
+
+challenge noname
+=> Error (unknown)
+
+challenge player1
+=> Error (yourself/game not set)
+
+game chess
+=> Error (unknown game)
+
+game tictactoe
+=> ok
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Commands from client2:
