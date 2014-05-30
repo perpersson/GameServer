@@ -1,5 +1,5 @@
-#ifndef CONNECT4_BOARD
-#define CONNECT4_BOARD
+#ifndef CONNECT4_BOARD_H
+#define CONNECT4_BOARD_H
 
 #include "GameBoard.h"
 

@@ -15,11 +15,9 @@
 
 using namespace std;
 
-map<char*, PlayerData*, StringCompareFunctor> GameServer::players;
-map<char*, GameData*, StringCompareFunctor> GameServer::challenges;
-
 GameServer::GameServer()
 {
+  commandHandler = CommandHandler::getInstance();
 }
 
 void GameServer::mainLoop()
@@ -65,84 +63,87 @@ void GameServer::mainLoop()
 
     // Create child thread.
     pthread_t thread;
-    int* threadArg = new int(newsockfd);
-    pthread_create(&thread, NULL, handleClient, (void*)threadArg);
+    ClientThreadData* clientThreadData = new ClientThreadData(this, newsockfd);
+    pthread_create(&thread, NULL, clientThreadStart, (void*)clientThreadData);
   }
 }
 
-void* GameServer::handleClient(void* sockArg)
+void* GameServer::clientThreadStart(void* clientThreadData)
 {
-  int sock = *(int*)sockArg;
+  ClientThreadData* data = (ClientThreadData*)clientThreadData;
+  GameServer* server = data->server;
+  server->clientThreadMainLoop(data->sock);
+  return NULL;
+}
+
+void GameServer::clientThreadMainLoop(int sock)
+{
   PlayerData* playerData = NULL;   // Data for this client.
   char buffer[1024];
-
+  char* dataAfterNewLine = NULL;
   while (1)
   {
     // Wait for socket input.
-    memset(buffer, 0, sizeof(buffer));
-    int n = read(sock, buffer, sizeof(buffer) - 1);
-    if (n < 0)
+    if (dataAfterNewLine == NULL)
     {
-      perror("ERROR reading from socket");
-      exit(1);
+      memset(buffer, 0, sizeof(buffer));
+      int n = read(sock, buffer, sizeof(buffer) - 1);
+      if (n < 0)
+      {
+        perror("ERROR reading from socket");
+        exit(1);
+      }
     }
-
-    // Trim leading and trailing spaces.
-    char* receivedString = buffer;
-    while (isspace(*receivedString))
-      ++receivedString;
-    char* last = &receivedString[strlen(receivedString) - 1];
-    while (last > receivedString && (*last == '\n' || isspace(*last)))
-      *last-- = '\0';
-    printf("Got command from client: %s\n", receivedString);
+    else
+      strcpy(buffer, dataAfterNewLine);
 
     // Parse receved command from client.
-    // Name must be told by client before "anything else" is possible.
-    if (strcmp(receivedString, "help") == 0)
-      showCommands(sock);
-    else if (strcmp(receivedString, "list") == 0 ||
-             strcmp(receivedString, "show") == 0 ||
-             strcmp(receivedString, "players") == 0)
-      listPlayers(sock);
-    else if (strcmp(receivedString, "games") == 0)
-      listGames(sock);
+    printf("Got command from client: %s\n", buffer);
+    char* restOfLine;
+    Command command =
+      commandHandler->parseCommand(buffer, (playerData != NULL),
+                                   restOfLine, dataAfterNewLine);
+    switch (command)
+    {
+      case NoDataCommand:
+        break;
+      case NameNotGivenYetCommand:
+        sendMessageToClient(sock, "Error: Tell me your name first");
+        break;
 
-    // Player related commands.
-    else if (strncmp(receivedString, "name ", 5) == 0)
-      addPlayer(&receivedString[5], sock, playerData);
-    else if (playerData == NULL)
-      sendMessageToClient(sock, "Error: Tell me your name first");
-    else if (strncmp(receivedString, "game ", 5) == 0)
-      setFavouriteGame(playerData, &receivedString[5]);
+      // Informational commands
+      case HelpCommand:       showCommands(sock); break;
+      case PlayersCommand:    showPlayers(sock); break;
+      case GamesCommand:      showGames(sock); break;
+      case ChallengesCommand: showChallenges(playerData); break;
 
-    // Challenge related commands.
-    else if (strncmp(receivedString, "challenge ", 10) == 0)
-      challengeOtherPlayer(playerData, &receivedString[10]);
-    else if (strncmp(receivedString, "recall ", 7) == 0)
-      recallChallenge(playerData, &receivedString[7]);
-    else if (strncmp(receivedString, "accept ", 7) == 0)
-      acceptChallenge(playerData, &receivedString[7]);
-    else if (strncmp(receivedString, "reject ", 7) == 0)
-      rejectChallenge(playerData, &receivedString[7]);
+      // Player related commands
+      case NameCommand: addPlayer(restOfLine, sock, playerData); break;
+      case GameCommand: setFavouriteGame(playerData, restOfLine); break;
 
-    // Game play commands.
-    else if (strncmp(receivedString, "play ", 5) == 0)
-      makePlayerMove(playerData, &receivedString[5]);
-    else if (strcmp(receivedString, "resign") == 0)
-      resignGame(playerData);
+      // Game playing related commands
+      case ChallengeCommand: challengeOtherPlayer(playerData, restOfLine); break;
+      case RecallCommand: recallChallenge(playerData, restOfLine); break;
+      case AcceptCommand: acceptChallenge(playerData, restOfLine); break;
+      case RejectCommand: rejectChallenge(playerData, restOfLine); break;
+      case PlayCommand:   makePlayerMove(playerData, restOfLine); break;
+      case ResignCommand: resignGame(playerData); break;
 
-    else if (strncmp(receivedString, "tell ", 5) == 0)
-      tellPlayer(playerData, &receivedString[5], "message");
+      // Other commands
+      case TellCommand:
+      {
+        char* otherPlayerName;
+        char* message;
+        commandHandler->getFirstWord(restOfLine, otherPlayerName, message);
+        tellPlayer(playerData, otherPlayerName, message);
+        break;
+      }
 
-    else
-      sendMessageToClient(sock, "Unknown command: %s", receivedString);
-      
-
-
-    // Debug to write something back to client for now...
-//    write(sock, "I got your message", 18);
+      default:
+        sendMessageToClient(sock, "Error: Unknown command '%s'", buffer);
+        break;
+    }
   }
-  return NULL;
 }
 
 void GameServer::showCommands(int sock)
@@ -164,7 +165,7 @@ void GameServer::showCommands(int sock)
   sendMessageToClient(sock, "%s", commands);
 }
 
-void GameServer::listPlayers(int sock)
+void GameServer::showPlayers(int sock)
 {
   char buffer[8192];
   int len = sprintf(buffer, "The players are:\n");
@@ -184,14 +185,14 @@ void GameServer::listPlayers(int sock)
   sendMessageToClient(sock, "%s", buffer);
 }
 
-void GameServer::listGames(int sock)
+void GameServer::showGames(int sock)
 {
   // Ask GameBordFactory for all known games.
   sendMessageToClient(sock, "%s",
                       GameBoardFactory::getInstance()->getGameList());
 }
 
-void GameServer::listChallenges(PlayerData* myData)
+void GameServer::showChallenges(PlayerData* myData)
 {
 }
 
@@ -480,7 +481,7 @@ void GameServer::tellPlayer(PlayerData* myData, char* playerName,
 
   sendMessageToClient(otherPlayerData->getSocket(), "%s: %s",
                       myData->getPlayerName(), message);
-  
+
 }
 
 void GameServer::sendMessageToClient(int sock, const char* formatString, ...)
@@ -510,7 +511,7 @@ void GameServer::sendGameBoardToPlayers(GameData* gameData)
   free(boardString);
 
   sendMessageToClient(playerToMoveSocket, "%s: It's your move",
-                      gameData->getPlayerToMove());  
+                      gameData->getPlayerToMove());
 }
 
 bool GameServer::playerExist(char* playerName)

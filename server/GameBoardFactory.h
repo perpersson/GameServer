@@ -1,5 +1,5 @@
-#ifndef GAME_BOARD_FACTORY
-#define GAME_BOARD_FACTORY
+#ifndef GAME_BOARD_FACTORY_H
+#define GAME_BOARD_FACTORY_H
 
 #include <string>
 #include <map>

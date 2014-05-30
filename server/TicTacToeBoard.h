@@ -1,5 +1,5 @@
-#ifndef TICTACTOE_BOARD
-#define TICTACTOE_BOARD
+#ifndef TICTACTOE_BOARD_H
+#define TICTACTOE_BOARD_H
 
 #include "GameBoard.h"
 

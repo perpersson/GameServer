@@ -1,5 +1,5 @@
-#ifndef GAME_DATA
-#define GAME_DATA
+#ifndef GAME_DATA_H
+#define GAME_DATA_H
 
 #include <stdlib.h>
 #include "GameBoard.h"

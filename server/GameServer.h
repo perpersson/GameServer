@@ -1,8 +1,9 @@
-#ifndef GAME_SERVER
-#define GAME_SERVER
+#ifndef GAME_SERVER_H
+#define GAME_SERVER_H
 
 #include <map>
 #include <string.h>
+#include "CommandHandler.h"
 #include "PlayerData.h"
 #include "GameBoardFactory.h"
 #include "StringCompareFunctor.h"
@@ -15,44 +16,52 @@ class GameServer
   void mainLoop();
 
  private:
-  static void* handleClient(void* sockArg);
+  struct ClientThreadData
+  {
+    ClientThreadData(GameServer* server, int sock) :
+      server(server), sock(sock) {}
+    GameServer* server;
+    int sock;
+  };
+  static void* clientThreadStart(void* clientThreadData);
+  void clientThreadMainLoop(int sock);
 
   // Client command methods.
-  static void showCommands(int sock);
-  static void listPlayers(int sock);
-  static void listGames(int sock);
-  static void listChallenges(PlayerData* myData);
+  void showCommands(int sock);
+  void showPlayers(int sock);
+  void showGames(int sock);
+  void showChallenges(PlayerData* myData);
 
-  static void addPlayer(char* playerName, int sock, PlayerData*& playerData);
-  static void setFavouriteGame(PlayerData* myData, char* game);
+  void addPlayer(char* playerName, int sock, PlayerData*& playerData);
+  void setFavouriteGame(PlayerData* myData, char* game);
 
-  static void challengeOtherPlayer(PlayerData* myData, char* challengee);
-  static void recallChallenge(PlayerData* myData, char* challengee);
-  static void acceptChallenge(PlayerData* myData, char* challenger);
-  static void rejectChallenge(PlayerData* myData, char* challenger);
+  void challengeOtherPlayer(PlayerData* myData, char* challengee);
+  void recallChallenge(PlayerData* myData, char* challengee);
+  void acceptChallenge(PlayerData* myData, char* challenger);
+  void rejectChallenge(PlayerData* myData, char* challenger);
 
-  static void makePlayerMove(PlayerData* myData, char* position);
-  static void resignGame(PlayerData* myData);
-  static void tellPlayer(PlayerData* myData, char* playerName,
-                         const char* message);
+  void makePlayerMove(PlayerData* myData, char* position);
+  void resignGame(PlayerData* myData);
+  void tellPlayer(PlayerData* myData, char* playerName, const char* message);
 
   // Private helper methods.
-  static void sendMessageToClient(int sock, const char* formatString, ...);
-  static void sendGameBoardToPlayers(GameData* gameData);
+  void sendMessageToClient(int sock, const char* formatString, ...);
+  void sendGameBoardToPlayers(GameData* gameData);
 
   // Player related methods.
-  static bool playerExist(char* playerName);
-  static PlayerData* getPlayerData(char* playerName);
-  static int getSocket(char* playerName);
+  bool playerExist(char* playerName);
+  PlayerData* getPlayerData(char* playerName);
+  int getSocket(char* playerName);
 
   // Challenge related methods.
-  static bool getChallengeData(int sock, char* challenger,
-			       PlayerData*& challengerData,
-			       GameData*& gameData);
+  bool getChallengeData(int sock, char* challenger,
+                        PlayerData*& challengerData, GameData*& gameData);
 
   // Data for players and challenges.
-  static std::map<char*, PlayerData*, StringCompareFunctor> players;
-  static std::map<char*, GameData*, StringCompareFunctor> challenges;  
+  std::map<char*, PlayerData*, StringCompareFunctor> players;
+  std::map<char*, GameData*, StringCompareFunctor> challenges;
+
+  CommandHandler* commandHandler;
 };
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef GAME_BOARD
-#define GAME_BOARD
+#ifndef GAME_BOARD_H
+#define GAME_BOARD_H
 
 // Generic interface for a board for all types of games.
 
