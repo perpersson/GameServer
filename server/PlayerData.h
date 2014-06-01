@@ -16,7 +16,7 @@ class PlayerData
   int getSocket() { return sock; }
   char* getPlayerName() { return playerName; }
   char* getFavouriteGame() { return favouriteGame; }
-  void setFavouriteGame(char* newFavouriteGame)
+  void setFavouriteGame(const char* newFavouriteGame)
   {
     free(favouriteGame);
     favouriteGame = strdup(newFavouriteGame);

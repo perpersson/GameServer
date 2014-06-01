@@ -1,3 +1,4 @@
+#include <string.h>
 #include "GameBoardFactory.h"
 #include "TicTacToeBoard.h"
 #include "Connect4Board.h"
@@ -9,8 +10,8 @@ GameBoardFactory* GameBoardFactory::instance = NULL;
 
 GameBoardFactory::GameBoardFactory()
 {
+  // Create game boards for all known games.
   gameBoards["tictactoe"] = new TicTacToeBoard();
-  gameBoards["ttt"] = new TicTacToeBoard();   // Alias for tictactoe
   gameBoards["connect4"] = new Connect4Board();
 //  gameBoards["othello"] = new OthelloBoard();
 
@@ -40,9 +41,27 @@ const char* GameBoardFactory::getGameList()
   return gameListString.c_str();
 }
 
-bool GameBoardFactory::gameExists(char* nameOfGame)
+const char* GameBoardFactory::getFullNameOfGame(const char* nameOfGameStart)
 {
-  return (gameBoards.find(nameOfGame) != gameBoards.end());
+  unsigned int nameLength = strlen(nameOfGameStart);
+  const char* bestMatch = NULL;
+  for (auto iter=gameBoards.begin(); iter!=gameBoards.end(); ++iter)
+  {
+    // Matches beginning of a command?
+    if (strncmp(nameOfGameStart, iter->first, nameLength) == 0)
+    {
+      // Exact match?
+      if (strlen(iter->first) == nameLength)
+        return nameOfGameStart;
+      // Another match already making this one ambigous?
+      else if (bestMatch != NULL)
+        return NULL;
+      // Store best match so far.
+      else
+        bestMatch = iter->first;
+    }
+  }
+  return bestMatch;
 }
 
 GameBoard* GameBoardFactory::createGameBoard(char* nameOfGame)

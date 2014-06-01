@@ -4,9 +4,9 @@
 
 TicTacToeBoard::TicTacToeBoard()
 {
-  playerA = 0;
-  playerB = 0;
-  playerAToMove = true;
+  player1 = 0;
+  player2 = 0;
+  player1ToMove = true;
 }
 
 TicTacToeBoard::~TicTacToeBoard()
@@ -31,22 +31,22 @@ bool TicTacToeBoard::makeMove(char* position)
   unsigned int positionBit = 1 << internalPosition;
 
   // Position taken already?
-  if (((playerA | playerB) & positionBit) != 0)
+  if (((player1 | player2) & positionBit) != 0)
     return false;
 
   // Make the move.
-  if (playerAToMove)
-    playerA |= positionBit;
+  if (player1ToMove)
+    player1 |= positionBit;
   else
-    playerB |= positionBit;
-  playerAToMove = !playerAToMove;
+    player2 |= positionBit;
+  player1ToMove = !player1ToMove;
   return true;
 }
 
 bool TicTacToeBoard::isGameOver() const
 {
   // Check for full board or a winner.
-  return ((playerA | playerB) == 0x1ff || getPlayer1Result() != 0);
+  return ((player1 | player2) == 0x1ff || getPlayer1Result() != 0);
 }
 
 int TicTacToeBoard::getPlayer1Result() const
@@ -56,9 +56,9 @@ int TicTacToeBoard::getPlayer1Result() const
   for (int index=0; index<8; ++index)
   {
     unsigned int combination = winningCombinations[index];
-    if ((playerA & combination) == combination)
+    if ((player1 & combination) == combination)
       return 1;
-    else if ((playerB & combination) == combination)
+    else if ((player2 & combination) == combination)
       return -1;
   }
   return 0;   // It's a draw.
@@ -76,9 +76,9 @@ char* TicTacToeBoard::getBoardAsString() const
   {
     unsigned int position = 1 << i;
     char c;
-    if ((playerA & position) != 0)
+    if ((player1 & position) != 0)
       c = 'X';
-    else if ((playerB & position) != 0)
+    else if ((player2 & position) != 0)
       c = 'O';
     else
       c = ' ';

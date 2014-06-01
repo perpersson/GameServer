@@ -4,8 +4,8 @@
 #include <map>
 #include <string.h>
 #include "CommandHandler.h"
-#include "PlayerData.h"
 #include "GameBoardFactory.h"
+#include "PlayerData.h"
 #include "StringCompareFunctor.h"
 
 class GameServer
@@ -46,7 +46,7 @@ class GameServer
 
   // Private helper methods.
   void sendMessageToClient(int sock, const char* formatString, ...);
-  void sendGameBoardToPlayers(GameData* gameData);
+  void sendGameDataToPlayers(GameData* gameData);
 
   // Player related methods.
   bool playerExist(char* playerName);
@@ -62,6 +62,7 @@ class GameServer
   std::map<char*, GameData*, StringCompareFunctor> challenges;
 
   CommandHandler* commandHandler;
+  GameBoardFactory* gameBoardFactory;
 };
 
 #endif

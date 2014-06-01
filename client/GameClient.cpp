@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
 {
   if (argc < 3)
   {
-    fprintf(stderr, "usage %s hostname port [name] [game]\n", argv[0]);
+    fprintf(stderr, "usage %s hostname port [name [game]]\n", argv[0]);
     exit(0);
   }
 
@@ -21,7 +21,6 @@ int main(int argc, char* argv[])
     name = argv[3];
   if (argc >= 4)
     game = argv[4];
-    
 
   // Create a socket point.
   int portno = atoi(argv[2]);
@@ -42,10 +41,10 @@ int main(int argc, char* argv[])
   sockaddr_in serv_addr;
   memset((char*)&serv_addr, 0, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
-  bcopy((char*)server->h_addr, (char*)&serv_addr.sin_addr.s_addr,
-        server->h_length);
+  memcpy((char*)server->h_addr, (char*)&serv_addr.sin_addr.s_addr,
+         server->h_length);
   serv_addr.sin_port = htons(portno);
-  if (connect(sock, (sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) 
+  if (connect(sock, (sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
   {
     perror("ERROR connecting");
     exit(1);
@@ -88,7 +87,7 @@ int main(int argc, char* argv[])
     {
       memset(buffer, 0, sizeof(buffer));
       int n = read(sock, buffer, sizeof(buffer) - 1);
-      if (n < 0) 
+      if (n < 0)
       {
         perror("ERROR reading from socket");
         exit(1);
@@ -106,7 +105,7 @@ int main(int argc, char* argv[])
 
       // Send message to server.
       int n = write(sock, buffer, strlen(buffer));
-      if (n < 0) 
+      if (n < 0)
       {
         perror("ERROR writing to socket");
         exit(1);

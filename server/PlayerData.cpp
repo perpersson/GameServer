@@ -13,4 +13,5 @@ PlayerData::~PlayerData()
 {
   free(playerName);
   free(favouriteGame);
+  delete onGoingGame;
 }

@@ -19,9 +19,9 @@ class TicTacToeBoard : public GameBoard
 
  private:
   // Private tictactoe specific data goes here.
-  unsigned int playerA;
-  unsigned int playerB;
-  bool playerAToMove;
+  unsigned int player1;
+  unsigned int player2;
+  bool player1ToMove;
 };
 
 #endif

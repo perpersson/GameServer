@@ -15,7 +15,7 @@ class GameBoardFactory
   static GameBoardFactory* getInstance();
 
   const char* getGameList();
-  bool gameExists(char* nameOfGame);
+  const char* getFullNameOfGame(const char* nameOfGameStart);
   GameBoard* createGameBoard(char* nameOfGame);
 
  private:
