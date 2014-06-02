@@ -15,13 +15,6 @@ int main(int argc, char* argv[])
     exit(0);
   }
 
-  char* name = NULL;
-  char* game = NULL;
-  if (argc >= 3)
-    name = argv[3];
-  if (argc >= 4)
-    game = argv[4];
-
   // Create a socket point.
   int portno = atoi(argv[2]);
   int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -50,17 +43,16 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
-  char buffer[8192];
-
   // Send name and game if given as arguments.
-  if (name != NULL)
+  char buffer[8192];
+  if (argc >= 3)
   {
-    sprintf(buffer, "name %s\n", name);
+    sprintf(buffer, "name %s\n", argv[3]);
     write(sock, buffer, strlen(buffer));
   }
-  if (game != NULL)
+  if (argc >= 4)
   {
-    sprintf(buffer, "game %s\n", game);
+    sprintf(buffer, "game %s\n", argv[4]);
     write(sock, buffer, strlen(buffer));
   }
 

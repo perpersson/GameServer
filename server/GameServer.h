@@ -11,7 +11,7 @@
 class GameServer
 {
  public:
-  GameServer();
+  GameServer(int port);
 
   void mainLoop();
 
@@ -41,12 +41,14 @@ class GameServer
   void rejectChallenge(PlayerData* myData, char* challenger);
 
   void makePlayerMove(PlayerData* myData, char* position);
+  void showBoard(PlayerData* myData);
   void resignGame(PlayerData* myData);
   void tellPlayer(PlayerData* myData, char* playerName, const char* message);
 
   // Private helper methods.
   void sendMessageToClient(int sock, const char* formatString, ...);
-  void sendGameDataToPlayers(GameData* gameData);
+  void sendGameDataToPlayers(GameData* gameData, bool showPlayerToMove,
+                             char* lastMovePosition);
 
   // Player related methods.
   bool playerExist(char* playerName);
@@ -56,11 +58,13 @@ class GameServer
   // Challenge related methods.
   bool getChallengeData(int sock, char* challenger,
                         PlayerData*& challengerData, GameData*& gameData);
+  bool getGameData(PlayerData* playerData, GameData*& gameData);
 
   // Data for players and challenges.
   std::map<char*, PlayerData*, StringCompareFunctor> players;
   std::map<char*, GameData*, StringCompareFunctor> challenges;
 
+  int serverPort;
   CommandHandler* commandHandler;
   GameBoardFactory* gameBoardFactory;
 };

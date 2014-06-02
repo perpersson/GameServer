@@ -114,8 +114,8 @@ bool Connect4Board::isWinLine(unsigned int startIndex, unsigned int step,
   for (unsigned int index=startIndex; index<boardSize; index+=step)
   {
     char thisMarker = board[index];
-    if (thisMarker != previousMarker)
-      identicalCount = 0;
+    if (thisMarker == ' ' || thisMarker != previousMarker)
+      identicalCount = 1;
     else if (++identicalCount == 4)
     {
       result = (thisMarker == 'X' ? 1 : -1);

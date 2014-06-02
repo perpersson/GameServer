@@ -15,8 +15,9 @@
 
 using namespace std;
 
-GameServer::GameServer()
+GameServer::GameServer(int port)
 {
+  serverPort = port;
   commandHandler = CommandHandler::getInstance();
   gameBoardFactory = GameBoardFactory::getInstance();
 }
@@ -32,12 +33,11 @@ void GameServer::mainLoop()
   }
 
   // Initialize socket structure.
-  int portno = 6792;
   sockaddr_in serverAddress;
   memset((char*)&serverAddress, 0, sizeof(serverAddress));
   serverAddress.sin_family = AF_INET;
   serverAddress.sin_addr.s_addr = INADDR_ANY;
-  serverAddress.sin_port = htons(portno);
+  serverAddress.sin_port = htons(serverPort);
 
   // Bind the host address using bind().
   if (bind(sockfd, (sockaddr*)&serverAddress, sizeof(serverAddress)) < 0)
@@ -47,7 +47,7 @@ void GameServer::mainLoop()
   }
 
   // Start listening for the clients.
-  printf("Game server is up and running on port %d\n", portno);
+  printf("Game server is up and running on port %d\n", serverPort);
   listen(sockfd, 100);
   sockaddr_in clientAddress;
   int clientLength = sizeof(clientAddress);
@@ -108,8 +108,11 @@ void GameServer::clientThreadMainLoop(int sock)
     {
       case NoDataCommand:
         break;
+      case AmbigousCommand:
+        sendMessageToClient(sock, "server: Ambigous command '%s'", buffer);
+        break;
       case NameNotGivenYetCommand:
-        sendMessageToClient(sock, "Error: Tell me your name first");
+        sendMessageToClient(sock, "server: Tell me your name first");
         break;
 
       // Informational commands
@@ -128,6 +131,7 @@ void GameServer::clientThreadMainLoop(int sock)
       case AcceptCommand: acceptChallenge(playerData, restOfLine); break;
       case RejectCommand: rejectChallenge(playerData, restOfLine); break;
       case PlayCommand:   makePlayerMove(playerData, restOfLine); break;
+      case BoardCommand:  showBoard(playerData); break;
       case ResignCommand: resignGame(playerData); break;
 
       // Other commands
@@ -141,7 +145,7 @@ void GameServer::clientThreadMainLoop(int sock)
       }
 
       default:
-        sendMessageToClient(sock, "Error: Unknown command '%s'", buffer);
+        sendMessageToClient(sock, "server: Unknown command '%s'", buffer);
         break;
     }
   }
@@ -158,16 +162,23 @@ void GameServer::showPlayers(int sock)
   int len = sprintf(buffer, "The players are:\n");
   for (auto iterator=players.begin(); iterator!=players.end(); ++iterator)
   {
-    len += sprintf(&buffer[len], "%-16s: ", iterator->first);
+    const char* playerName = iterator->first;
+    len += sprintf(&buffer[len], "%-16s: ", playerName);
 
     // Check what game player is playing or wants to play.
     PlayerData* playerData = iterator->second;
-    char* game = playerData->getFavouriteGame();
-    if (game == NULL)
+    char* gameName = playerData->getFavouriteGame();
+    GameData* gameData = playerData->getOngoingGame();
+    if (gameName == NULL)
       len += sprintf(&buffer[len], "Game not selected\n");
     else
-      len += sprintf(&buffer[len], "%s%s\n", game,
-                     playerData->isPlayingAGame() ? " (playing)" : "");
+    {
+      char playingData[1024] = {0};
+      if (gameData != NULL)
+        sprintf(playingData, " (playing with %s)",
+                gameData->getOtherPlayer(playerName));
+      len += sprintf(&buffer[len], "%s%s\n", gameName, playingData);
+    }
   }
   sendMessageToClient(sock, "%s", buffer);
 }
@@ -175,26 +186,36 @@ void GameServer::showPlayers(int sock)
 void GameServer::showGames(int sock)
 {
   // Ask GameBordFactory for all known games.
-  sendMessageToClient(sock, "%s", gameBoardFactory->getGameList());
+  sendMessageToClient(sock, "You can play these games:\n%s",
+                      gameBoardFactory->getGameList());
 }
 
 void GameServer::showChallenges(PlayerData* myData)
 {
+  bool challengeFound = false;
+
   // Show if player has challenged anyone.
   auto iterator = challenges.find(myData->getPlayerName());
   if (iterator != challenges.end())
+  {
+    challengeFound = true;
     sendMessageToClient(myData->getSocket(), "You have challenged %s\n",
                         iterator->second->getChallengee());
+  }
 
   // Show if player has been challenged by anyone.
   const char* name = myData->getPlayerName();
   for (iterator=challenges.begin(); iterator!=challenges.end(); ++iterator)
     if (strcmp(name, iterator->second->getChallengee()) == 0)
     {
+      challengeFound = true;
       sendMessageToClient(myData->getSocket(),
                           "You have been challenged by %s\n",
                           iterator->second->getChallenger());
     }
+
+  if (!challengeFound)
+    sendMessageToClient(myData->getSocket(), "No challenges found");
 }
 
 void GameServer::addPlayer(char* playerName, int sock, PlayerData*& playerData)
@@ -204,7 +225,7 @@ void GameServer::addPlayer(char* playerName, int sock, PlayerData*& playerData)
   // Name changes aren't allowed.
   if (playerData != NULL)
   {
-    sendMessageToClient(sock, "You can't change your name %s",
+    sendMessageToClient(sock, "server: You can't change your name %s",
                         playerData->getPlayerName());
     return;
   }
@@ -215,13 +236,13 @@ void GameServer::addPlayer(char* playerName, int sock, PlayerData*& playerData)
   commandHandler->getFirstWord(playerName, firstWord, restOfString);
   if (*restOfString != '\0')
   {
-    sendMessageToClient(sock, "Spaces are not allowed in player name");
+    sendMessageToClient(sock, "server: Spaces are not allowed in player name");
     return;
   }
 
   if (playerExist(playerName))
   {
-    sendMessageToClient(sock, "Player %s already exists", playerName);
+    sendMessageToClient(sock, "server: Player %s already exists", playerName);
     return;
   }
 
@@ -235,10 +256,14 @@ void GameServer::setFavouriteGame(PlayerData* myData, char* nameOfGame)
   // Validate that we know the rules of the selected game.
   const char* game = gameBoardFactory->getFullNameOfGame(nameOfGame);
   if (game != NULL)
+  {
     myData->setFavouriteGame(game);
+    sendMessageToClient(myData->getSocket(),
+                        "server: Setting favourite game to %s", game);
+  }
   else
     sendMessageToClient(myData->getSocket(),
-                        "Error: I don't know the rules of %s", nameOfGame);
+                        "server: I don't know the rules of %s", nameOfGame);
 }
 
 void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
@@ -248,7 +273,7 @@ void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
   if (opponentData == NULL)
   {
     sendMessageToClient(myData->getSocket(),
-                        "Error: Don't know who %s is", challengee);
+                        "server: I don't know who %s is", challengee);
     return;
   }
 
@@ -256,7 +281,7 @@ void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
   if (myData == opponentData)
   {
     sendMessageToClient(myData->getSocket(),
-                        "Error: You're not allowed to challenge yourself");
+                        "server: You're not allowed to challenge yourself");
     return;
   }
 
@@ -264,7 +289,7 @@ void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
   if (myData->getFavouriteGame() == NULL)
   {
     sendMessageToClient(myData->getSocket(),
-                        "Error: Tell me your favourite game first");
+                        "server: Tell me your favourite game first");
     return;
   }
 
@@ -272,7 +297,7 @@ void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
   if (strcmp(myData->getFavouriteGame(),
              opponentData->getFavouriteGame()) != 0)
   {
-    sendMessageToClient(myData->getSocket(), "Error: %s wants to play %s",
+    sendMessageToClient(myData->getSocket(), "server: %s wants to play %s",
                         challengee, opponentData->getFavouriteGame());
     return;
   }
@@ -283,7 +308,7 @@ void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
   if (gameData != NULL)
   {
     sendMessageToClient(myData->getSocket(),
-                        "Error: You're already playing a game against %s",
+                        "server: You're already playing a game against %s",
                         gameData->getOtherPlayer(challenger));
     return;
   }
@@ -293,7 +318,7 @@ void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
   if (gameData != NULL)
   {
     sendMessageToClient(myData->getSocket(),
-                        "Error: %s is already playing a game against %s",
+                        "server: %s is already playing a game against %s",
                         challengee, gameData->getOtherPlayer(challengee));
     return;
   }
@@ -303,7 +328,7 @@ void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
   if (iterator != challenges.end())
   {
     sendMessageToClient(myData->getSocket(),
-                        "Error: You have already challenged %s",
+                        "server: You have already challenged %s",
                         iterator->second->getOtherPlayer(challenger));
     return;
   }
@@ -315,7 +340,7 @@ void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
 
   // Send challenge to other player.
   sendMessageToClient(opponentData->getSocket(),
-                      "%s is challenging you to a game of %s",
+                      "server: %s is challenging you to a game of %s",
                       myData->getPlayerName(),
                       myData->getFavouriteGame());
 }
@@ -330,18 +355,15 @@ void GameServer::recallChallenge(PlayerData* myData, char* challengee)
   {
     PlayerData* opponentData = getPlayerData(challengee);
     sendMessageToClient(opponentData->getSocket(),
-                        "%s is recalling the challenge to a game of %s",
-                        myData->getPlayerName(),
-                        myData->getFavouriteGame());
+                        "server: %s is recalling the challenge",
+                        myData->getPlayerName());
 
     delete iterator->second;
     challenges.erase(challenger);
   }
   else
-  {
     sendMessageToClient(myData->getSocket(),
-                        "Error: You haven't challenged %s", challengee);
-  }
+                        "server: You haven't challenged %s", challengee);
 }
 
 void GameServer::acceptChallenge(PlayerData* myData, char* challenger)
@@ -350,7 +372,7 @@ void GameServer::acceptChallenge(PlayerData* myData, char* challenger)
   if (myData->isPlayingAGame())
   {
     sendMessageToClient(myData->getSocket(),
-                        "Error: You're already playing a game");
+                        "server: You're already playing a game");
     return;
   }
 
@@ -365,7 +387,7 @@ void GameServer::acceptChallenge(PlayerData* myData, char* challenger)
     if (iterator != challenges.end())
     {
       sendMessageToClient(myData->getSocket(),
-                          "Info: Recalling your challenge to %s\n",
+                          "server: Recalling your challenge to %s\n",
                           iterator->second->getChallengee());
       recallChallenge(myData, iterator->second->getChallengee());
     }
@@ -375,7 +397,7 @@ void GameServer::acceptChallenge(PlayerData* myData, char* challenger)
 
     // Send challenge accepted to other player.
     sendMessageToClient(opponentData->getSocket(),
-                        "%s accepted the challenge of a game of %s\n",
+                        "server: %s accepted the challenge of a game of %s\n",
                         myData->getPlayerName(),
                         opponentData->getFavouriteGame());
 
@@ -384,7 +406,7 @@ void GameServer::acceptChallenge(PlayerData* myData, char* challenger)
     opponentData->setOngoingGame(gameData);
 
     gameData->startGame();
-    sendGameDataToPlayers(gameData);
+    sendGameDataToPlayers(gameData, true, NULL);
   }
 }
 
@@ -397,10 +419,9 @@ void GameServer::rejectChallenge(PlayerData* myData, char* challenger)
   {
     // Send challenge rejected to opponent.
     sendMessageToClient(opponentData->getSocket(),
-                        "%s rejected your challenge of a game of %s",
+                        "server: %s rejected your challenge of a game of %s",
                         myData->getPlayerName(),
                         opponentData->getFavouriteGame());
-
 
     // Remove all challenge data.
     delete gameData;
@@ -410,19 +431,15 @@ void GameServer::rejectChallenge(PlayerData* myData, char* challenger)
 
 void GameServer::makePlayerMove(PlayerData* myData, char* position)
 {
-  // Get the board and make the move.
-  GameData* gameData = myData->getOngoingGame();
-  if (gameData == NULL)
-  {
-    sendMessageToClient(myData->getSocket(),
-                        "Error: You're not playing any game");
+  GameData* gameData;
+  if (!getGameData(myData, gameData))
     return;
-  }
 
   // Ensure that it's my move.
-  if (strcmp(gameData->getPlayerToMove(), myData->getPlayerName()) != 0)
+  const char* myName = myData->getPlayerName();
+  if (strcmp(gameData->getPlayerToMove(), myName) != 0)
   {
-    sendMessageToClient(myData->getSocket(), "Error: It's %s to play",
+    sendMessageToClient(myData->getSocket(), "server: It's %s to play",
                         gameData->getPlayerToMove());
     return;
   }
@@ -431,37 +448,37 @@ void GameServer::makePlayerMove(PlayerData* myData, char* position)
   if (gameBoard->makeMove(position))
   {
     // Switch player to move and send board to both players.
-    gameData->switchPlayerToMove();
-    sendGameDataToPlayers(gameData);
+    bool gameOver = gameBoard->isGameOver();
+    if (!gameOver)
+      gameData->switchPlayerToMove();
+    sendGameDataToPlayers(gameData, !gameOver, position);
 
-    if (gameBoard->isGameOver())
+    if (gameOver)
     {
       // Send game result to both players.
       int result = gameBoard->getPlayer1Result();
-      PlayerData* opponentData = getPlayerData(gameData->getPlayerToMove());
+      PlayerData* opponentData =
+        getPlayerData(gameData->getOtherPlayer(myName));
 
       // Tell players who won.
-      bool iAmPlayer1 =
-        (strcmp(myData->getPlayerName(), gameData->getPlayer1()) == 0);
+      bool iAmPlayer1 = (strcmp(myName, gameData->getPlayer1()) == 0);
       int mySocket = myData->getSocket();
       int opponentSocket = opponentData->getSocket();
       if (result == 0)
       {
-        sendMessageToClient(mySocket, "Game over: It's a draw");
-        sendMessageToClient(opponentSocket, "Game over: It's a draw");
+        sendMessageToClient(mySocket, "server: Game over. It's a draw");
+        sendMessageToClient(opponentSocket, "server: Game over. It's a draw");
       }
       else if ((result > 0 && iAmPlayer1) || (result < 0 && !iAmPlayer1))
       {
-        sendMessageToClient(mySocket, "Game over: You won");
-        sendMessageToClient(opponentSocket, "Game over: You lost");
+        sendMessageToClient(mySocket, "server: Game over. You won");
+        sendMessageToClient(opponentSocket, "server: Game over. You lost");
       }
       else
       {
-        sendMessageToClient(mySocket, "Game over: You lost");
-        sendMessageToClient(opponentSocket, "Game over: You won");
+        sendMessageToClient(mySocket, "server: Game over. You lost");
+        sendMessageToClient(opponentSocket, "server: Game over. You won");
       }
-
-      printf("Game over. Result: %d\n", result);
 
       // Delete all GameData.
       myData->clearOngoingGame();
@@ -471,26 +488,41 @@ void GameServer::makePlayerMove(PlayerData* myData, char* position)
   }
   else
     sendMessageToClient(myData->getSocket(),
-                        "Error: Illegal move %s", position);
+                        "server: Illegal move %s", position);
+}
+
+void GameServer::showBoard(PlayerData* myData)
+{
+  GameData* gameData;
+  if (!getGameData(myData, gameData))
+    return;
+
+  // Show board.
+  char* boardString = gameData->getBoard()->getBoardAsString();
+  sendMessageToClient(myData->getSocket(), "%s", boardString);
+  free(boardString);
+
+  // Show if it's your turn to move.
+  if (strcmp(myData->getPlayerName(), gameData->getPlayerToMove()) == 0)
+    sendMessageToClient(myData->getSocket(), "server: It's your move");
 }
 
 void GameServer::resignGame(PlayerData* myData)
 {
-  // Check if we're playing a game.
-  GameData* gameData = myData->getOngoingGame();
-  if (gameData == NULL)
-  {
-    sendMessageToClient(myData->getSocket(),
-                        "Error: You're not playing any game");
+  GameData* gameData;
+  if (!getGameData(myData, gameData))
     return;
-  }
+
+  // Send resign confirmation.
+  sendMessageToClient(myData->getSocket(), "server: You lost\n");
 
   // Tell other player we resigned.
-  char* opponentName = gameData->getOtherPlayer(myData->getPlayerName());
+  char* myName = myData->getPlayerName();
+  char* opponentName = gameData->getOtherPlayer(myName);
   PlayerData* opponentData = getPlayerData(opponentName);
   sendMessageToClient(opponentData->getSocket(),
-                      "%s: I resign. You win.", myData->getPlayerName());
-  
+                      "%s: I resign. You win.", myName);
+
   // Delete all GameData.
   myData->clearOngoingGame();
   opponentData->clearOngoingGame();
@@ -504,7 +536,7 @@ void GameServer::tellPlayer(PlayerData* myData, char* playerName,
   if (otherPlayerData == NULL)
   {
     sendMessageToClient(myData->getSocket(),
-                        "Error: Don't know who %s is", playerName);
+                        "server: I don't know who %s is", playerName);
     return;
   }
   sendMessageToClient(otherPlayerData->getSocket(), "%s: %s",
@@ -522,23 +554,33 @@ void GameServer::sendMessageToClient(int sock, const char* formatString, ...)
     va_end(argList);
 
     write(sock, buffer, length);
-    printf("Message to client (%d):\n%s\n", sock, buffer);
+    printf("Message to client (%d): %s\n", sock, buffer);
   }
 }
 
-void GameServer::sendGameDataToPlayers(GameData* gameData)
+void GameServer::sendGameDataToPlayers(GameData* gameData,
+                                       bool showPlayerToMove,
+                                       char* lastMovePosition)
 {
+  // Show previous move for next player to move.
+  char* playerToMove = gameData->getPlayerToMove();
+  int playerToMoveSocket = getSocket(playerToMove);
+  if (lastMovePosition != NULL)
+    sendMessageToClient(playerToMoveSocket, "%s: play %s\n",
+                        gameData->getOtherPlayer(playerToMove),
+                        lastMovePosition);
+
+  // Show resulting game board for both players.
   int player1Socket = getSocket(gameData->getPlayer1());
   int player2Socket = getSocket(gameData->getPlayer2());
-  int playerToMoveSocket = getSocket(gameData->getPlayerToMove());
-
   char* boardString = gameData->getBoard()->getBoardAsString();
   sendMessageToClient(player1Socket, "%s", boardString);
   sendMessageToClient(player2Socket, "%s", boardString);
   free(boardString);
 
-  sendMessageToClient(playerToMoveSocket, "%s: It's your move",
-                      gameData->getPlayerToMove());
+  // Show who should move next.
+  if (showPlayerToMove)
+    sendMessageToClient(playerToMoveSocket, "server: It's your move");
 }
 
 bool GameServer::playerExist(char* playerName)
@@ -565,7 +607,7 @@ bool GameServer::getChallengeData(int sock, char* challenger,
   challengerData = getPlayerData(challenger);
   if (challengerData == NULL)
   {
-    sendMessageToClient(sock, "Error: Don't know who %s is", challenger);
+    sendMessageToClient(sock, "server: I don't know who %s is", challenger);
     return false;
   }
 
@@ -573,7 +615,7 @@ bool GameServer::getChallengeData(int sock, char* challenger,
   auto iterator = challenges.find(challenger);
   if (iterator == challenges.end())
   {
-    sendMessageToClient(sock, "Error: There's no challenge from %s",
+    sendMessageToClient(sock, "server: There's no challenge from %s",
                         challenger);
     return false;
   }
@@ -581,4 +623,18 @@ bool GameServer::getChallengeData(int sock, char* challenger,
   // All data found ok.
   gameData = iterator->second;
   return true;
+}
+
+bool GameServer::getGameData(PlayerData* playerData, GameData*& gameData)
+{
+  // Check if we're playing a game.
+  gameData = playerData->getOngoingGame();
+  if (gameData != NULL)
+    return true;
+  else
+  {
+    sendMessageToClient(playerData->getSocket(),
+                        "server: You're not playing any game");
+    return false;
+  }
 }

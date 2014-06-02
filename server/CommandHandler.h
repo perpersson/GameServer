@@ -28,6 +28,7 @@ enum Command
   AcceptCommand,
   RejectCommand,
   PlayCommand,
+  BoardCommand,
   ResignCommand,
 
   // Other commands

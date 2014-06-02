@@ -27,11 +27,12 @@ CommandHandler::CommandHandler()
   addCommand("accept <player>       Accept challenge from another player", AcceptCommand, true);
   addCommand("reject <player>       Reject challenge from another player", RejectCommand, true);
   addCommand("play <move>           Make a move in the ongoing game", PlayCommand, true);
+  addCommand("board                 Show board for ongoing game", BoardCommand, true);
   addCommand("resign                Give up current game", ResignCommand, true);
   addCommand("tell <player> <msg>   Send a message to player", TellCommand, true);
 
   // Add final help text.
-  helpString += "Command abbreviations are allowed when not ambigous\n";
+  helpString += "\nCommand abbreviations are allowed when not ambigous\n";
 }
 
 void CommandHandler::addCommand(const char* commandHelp, Command command,
@@ -71,6 +72,10 @@ Command CommandHandler::parseCommand(char* input, bool nameGiven,
   char* firstWord;
   getFirstWord(input, firstWord, restOfLine);
   unsigned int firstWordLength = strlen(firstWord);
+  if (firstWordLength == 0)
+    return NoDataCommand;
+
+  // Check if there's a match for any command. Full or shortened match.
   Command bestMatchingCommand = UnknownCommand;
   for (auto iterator=commands.begin(); iterator!=commands.end(); ++iterator)
   {
@@ -95,10 +100,7 @@ Command CommandHandler::parseCommand(char* input, bool nameGiven,
       }
     }
   }
-  if (bestMatchingCommand != UnknownCommand)
-    return bestMatchingCommand;
-  else
-    return (strlen(firstWord) == 0 ? NoDataCommand : UnknownCommand);
+  return bestMatchingCommand;
 }
 
 char* CommandHandler::getFirstWord(char* input,

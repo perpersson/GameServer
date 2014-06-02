@@ -2,6 +2,7 @@
 #define GAME_DATA_H
 
 #include <stdlib.h>
+#include <string.h>
 #include "GameBoard.h"
 #include "GameBoardFactory.h"
 
@@ -36,7 +37,7 @@ class GameData
   char* getPlayer1() const { return player1; }
   char* getPlayer2() const { return player2; }
   char* getOtherPlayer(const char* player) const
-  { return (player == player1 ? player2 : player1); }
+  { return (strcmp(player, player1) == 0 ? player2 : player1); }
   char* getPlayerToMove() const { return playerToMove; }
   
   void switchPlayerToMove()
