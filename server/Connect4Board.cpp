@@ -22,7 +22,7 @@ GameBoard* Connect4Board::create()
 bool Connect4Board::makeMove(char* position)
 {
   // Check for illegal position.
-  if (position[0] < '1' || position[0] > '7')
+  if (position[0] < '1' || position[0] > '7' || position[1] != '\0')
     return false;
 
   // Convert to internal row and column values and get next free row.

@@ -3,78 +3,16 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <ctype.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <pthread.h>
 
 #include "GameServer.h"
 #include "GameBoard.h"
-#include "TicTacToeBoard.h"
 
 using namespace std;
 
-GameServer::GameServer(int port)
+GameServer::GameServer()
 {
-  serverPort = port;
   commandHandler = CommandHandler::getInstance();
   gameBoardFactory = GameBoardFactory::getInstance();
-}
-
-void GameServer::mainLoop()
-{
-  // Create a socket.
-  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-  if (sockfd < 0)
-  {
-    perror("ERROR opening socket");
-    exit(1);
-  }
-
-  // Initialize socket structure.
-  sockaddr_in serverAddress;
-  memset((char*)&serverAddress, 0, sizeof(serverAddress));
-  serverAddress.sin_family = AF_INET;
-  serverAddress.sin_addr.s_addr = INADDR_ANY;
-  serverAddress.sin_port = htons(serverPort);
-
-  // Bind the host address using bind().
-  if (bind(sockfd, (sockaddr*)&serverAddress, sizeof(serverAddress)) < 0)
-  {
-    perror("ERROR on binding");
-    exit(1);
-  }
-
-  // Start listening for the clients.
-  printf("Game server is up and running on port %d\n", serverPort);
-  listen(sockfd, 100);
-  sockaddr_in clientAddress;
-  int clientLength = sizeof(clientAddress);
-  while (1)
-  {
-    // Accept connection from client.
-    int newsockfd =
-      accept(sockfd, (sockaddr*)&clientAddress, (socklen_t*)&clientLength);
-    if (newsockfd < 0)
-    {
-      perror("ERROR on accept");
-      exit(1);
-    }
-
-    // Create child thread.
-    pthread_t thread;
-    ClientThreadData* clientThreadData = new ClientThreadData(this, newsockfd);
-    pthread_create(&thread, NULL, clientThreadStart, (void*)clientThreadData);
-  }
-}
-
-void* GameServer::clientThreadStart(void* clientThreadData)
-{
-  ClientThreadData* data = (ClientThreadData*)clientThreadData;
-  GameServer* server = data->server;
-  server->clientThreadMainLoop(data->sock);
-  return NULL;
 }
 
 void GameServer::clientThreadMainLoop(int sock)
@@ -104,6 +42,7 @@ void GameServer::clientThreadMainLoop(int sock)
     Command command =
       commandHandler->parseCommand(buffer, (playerData != NULL),
                                    restOfLine, dataAfterNewLine);
+    commandMutex.lock();
     switch (command)
     {
       case NoDataCommand:
@@ -117,7 +56,7 @@ void GameServer::clientThreadMainLoop(int sock)
 
       // Informational commands
       case HelpCommand:       showCommands(sock); break;
-      case PlayersCommand:    showPlayers(sock); break;
+      case WhoCommand:        showPlayers(sock); break;
       case GamesCommand:      showGames(sock); break;
       case ChallengesCommand: showChallenges(playerData); break;
 
@@ -148,6 +87,7 @@ void GameServer::clientThreadMainLoop(int sock)
         sendMessageToClient(sock, "server: Unknown command '%s'", buffer);
         break;
     }
+    commandMutex.unlock();
   }
 }
 
@@ -333,6 +273,17 @@ void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
     return;
   }
 
+  // Check that challengee hasn't challenged us already.
+  iterator = challenges.find(challengee);
+  if (iterator != challenges.end() &&
+      strcmp(iterator->second->getChallengee(), challenger) == 0)
+  {
+    sendMessageToClient(myData->getSocket(),
+                        "server: You have already been challenged by %s",
+                        iterator->second->getChallenger());
+    return;
+  }
+
   // Create and store new challenge.
   challenges[challenger] = new GameData(myData->getFavouriteGame(),
                                         myData->getPlayerName(),
@@ -343,6 +294,8 @@ void GameServer::challengeOtherPlayer(PlayerData* myData, char* challengee)
                       "server: %s is challenging you to a game of %s",
                       myData->getPlayerName(),
                       myData->getFavouriteGame());
+  sendMessageToClient(myData->getSocket(), "server: Challenge sent to %s",
+                      opponentData->getPlayerName());
 }
 
 void GameServer::recallChallenge(PlayerData* myData, char* challengee)
@@ -360,6 +313,7 @@ void GameServer::recallChallenge(PlayerData* myData, char* challengee)
 
     delete iterator->second;
     challenges.erase(challenger);
+    sendMessageToClient(myData->getSocket(), "server: Challenge recalled");
   }
   else
     sendMessageToClient(myData->getSocket(),
@@ -397,7 +351,7 @@ void GameServer::acceptChallenge(PlayerData* myData, char* challenger)
 
     // Send challenge accepted to other player.
     sendMessageToClient(opponentData->getSocket(),
-                        "server: %s accepted the challenge of a game of %s\n",
+                        "server: %s accepted the challenge to play a game of %s\n",
                         myData->getPlayerName(),
                         opponentData->getFavouriteGame());
 

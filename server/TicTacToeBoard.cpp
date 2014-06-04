@@ -23,7 +23,8 @@ bool TicTacToeBoard::makeMove(char* position)
   // Check for illegal position.
   position[0] = tolower(position[0]);
   if (position[0] < 'a' || position[0] > 'c' ||
-      position[1] < '1' || position[1] > '3')
+      position[1] < '1' || position[1] > '3' ||
+      position[2] != '\0')
     return false;
 
   // Convert to internal position values.

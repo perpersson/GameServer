@@ -2,6 +2,7 @@
 #define GAME_SERVER_H
 
 #include <map>
+#include <mutex>
 #include <string.h>
 #include "CommandHandler.h"
 #include "GameBoardFactory.h"
@@ -11,21 +12,11 @@
 class GameServer
 {
  public:
-  GameServer(int port);
+  GameServer();
 
-  void mainLoop();
-
- private:
-  struct ClientThreadData
-  {
-    ClientThreadData(GameServer* server, int sock) :
-      server(server), sock(sock) {}
-    GameServer* server;
-    int sock;
-  };
-  static void* clientThreadStart(void* clientThreadData);
   void clientThreadMainLoop(int sock);
 
+ private:
   // Client command methods.
   void showCommands(int sock);
   void showPlayers(int sock);
@@ -61,10 +52,10 @@ class GameServer
   bool getGameData(PlayerData* playerData, GameData*& gameData);
 
   // Data for players and challenges.
+  std::mutex commandMutex;
   std::map<char*, PlayerData*, StringCompareFunctor> players;
   std::map<char*, GameData*, StringCompareFunctor> challenges;
 
-  int serverPort;
   CommandHandler* commandHandler;
   GameBoardFactory* gameBoardFactory;
 };

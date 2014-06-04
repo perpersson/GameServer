@@ -19,7 +19,7 @@ CommandHandler::CommandHandler()
   addCommand("help                  Show this help", HelpCommand, false);
   addCommand("name <your name>      Set your name", NameCommand, false);
   addCommand("game <game to play>   Set the game you want to play", GameCommand, true);
-  addCommand("players               List all players", PlayersCommand, false);
+  addCommand("who                   List all players", WhoCommand, false);
   addCommand("games                 List all games that are possible to play", GamesCommand, false);
   addCommand("challenges            List challenges to/from you", ChallengesCommand, true);
   addCommand("challenge <player>    Challenge another player", ChallengeCommand, true);
@@ -65,8 +65,8 @@ Command CommandHandler::parseCommand(char* input, bool nameGiven,
 
   // Remove trailing spaces in command.
   char* p = strchr(input, '\0');
-  while (p != input && isspace(*p))
-    *p-- = '\0';
+  while (--p > input && isspace(*p))
+    *p = '\0';
 
   // Get first word from input and check if it matches any command.
   char* firstWord;

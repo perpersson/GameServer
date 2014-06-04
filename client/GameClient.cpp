@@ -7,6 +7,63 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+void waitForInput(int sock, fd_set* read_fds, bool waitStdin, bool waitSocket,
+                  int timeoutInMilliSeconds = 0)
+{
+  FD_ZERO(read_fds);
+  if (waitStdin)
+    FD_SET(fileno(stdin), read_fds);
+  if (waitSocket)
+    FD_SET(sock, read_fds);
+  struct timeval timeout =
+    {timeoutInMilliSeconds / 1000, (timeoutInMilliSeconds % 1000) * 1000};
+  if (select(sock + 1, read_fds, NULL, NULL,
+             (timeoutInMilliSeconds > 0 ? &timeout : NULL)) == -1)
+  {
+    perror("ERROR in select");
+    exit(1);
+  }
+}
+
+bool checkForStdinData(int sock, fd_set* read_fds)
+{
+  // Is there something from stdin?
+  if (FD_ISSET(fileno(stdin), read_fds))
+  {
+    char buffer[8192] = {0};
+    fgets(buffer, sizeof(buffer) - 1, stdin);
+    
+    // Send message to server.
+    int n = write(sock, buffer, strlen(buffer));
+    if (n < 0)
+    {
+      perror("ERROR writing to socket");
+      exit(1);
+    }
+    return true;
+  }
+  return false;
+}
+
+bool checkForSocketData(int sock, fd_set* read_fds)
+{
+  // Is there any data to read from the socket?
+  if (FD_ISSET(sock, read_fds))
+  {
+    char buffer[8192] = {0};
+    int n = read(sock, buffer, sizeof(buffer) - 1);
+    if (n < 0)
+    {
+      perror("ERROR reading from socket");
+      exit(1);
+    }
+    if (n > 0)
+      printf("%s\n", buffer);
+    return true;
+  }
+  return false;
+}
+
 int main(int argc, char* argv[])
 {
   if (argc < 3)
@@ -56,52 +113,19 @@ int main(int argc, char* argv[])
     write(sock, buffer, strlen(buffer));
   }
 
-  bool commandEntered = true;
   while (1)
   {
-    if (commandEntered)
-      printf("Enter your command:\n");
-    commandEntered = false;
+    printf("Enter your command:\n");
 
     // Wait for both stdin and socket data.
     fd_set read_fds;
-    FD_ZERO(&read_fds);
-    FD_SET(fileno(stdin), &read_fds);
-    FD_SET(sock, &read_fds);
-    if (select(sock + 1, &read_fds, NULL, NULL, NULL) == -1)
+    waitForInput(sock, &read_fds, true, true);
+    checkForSocketData(sock, &read_fds);
+    if (checkForStdinData(sock, &read_fds))
     {
-      perror("ERROR in select");
-      exit(1);
-    }
-
-    // Is there any data to read from the socket?
-    if (FD_ISSET(sock, &read_fds))
-    {
-      memset(buffer, 0, sizeof(buffer));
-      int n = read(sock, buffer, sizeof(buffer) - 1);
-      if (n < 0)
-      {
-        perror("ERROR reading from socket");
-        exit(1);
-      }
-      if (n > 0)
-        printf("%s\n", buffer);
-    }
-
-    // Is there something from stdin?
-    if (FD_ISSET(fileno(stdin), &read_fds))
-    {
-      commandEntered = true;
-      memset(buffer, 0, sizeof(buffer));
-      fgets(buffer, sizeof(buffer) - 1, stdin);
-
-      // Send message to server.
-      int n = write(sock, buffer, strlen(buffer));
-      if (n < 0)
-      {
-        perror("ERROR writing to socket");
-        exit(1);
-      }
+      // Wait for a while for server response.
+      waitForInput(sock, &read_fds, false, true, 500);
+      checkForSocketData(sock, &read_fds);
     }
   }
   return 0;

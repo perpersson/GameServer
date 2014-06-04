@@ -14,7 +14,7 @@ enum Command
 
   // Informational commands
   HelpCommand,
-  PlayersCommand,
+  WhoCommand,
   GamesCommand,
   ChallengesCommand,
 

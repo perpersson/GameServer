@@ -1,4 +1,4 @@
-#include "GameServer.h"
+#include "SocketServer.h"
 
 int main(int argc, char* argv[])
 {
@@ -9,7 +9,7 @@ int main(int argc, char* argv[])
   }
 
   int port = atoi(argv[1]);
-  GameServer server(port);
+  SocketServer server(port);
   server.mainLoop();
   return 0;
 }
