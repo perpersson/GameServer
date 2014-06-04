@@ -69,7 +69,7 @@ void GameServer::clientThreadMainLoop(int sock)
       case RecallCommand: recallChallenge(playerData, restOfLine); break;
       case AcceptCommand: acceptChallenge(playerData, restOfLine); break;
       case RejectCommand: rejectChallenge(playerData, restOfLine); break;
-      case PlayCommand:   makePlayerMove(playerData, restOfLine); break;
+      case MoveCommand:   makePlayerMove(playerData, restOfLine); break;
       case BoardCommand:  showBoard(playerData); break;
       case ResignCommand: resignGame(playerData); break;
 
@@ -189,6 +189,7 @@ void GameServer::addPlayer(char* playerName, int sock, PlayerData*& playerData)
   // Create new PlayerData and store name and socket.
   playerData = new PlayerData(playerName, sock);
   players[strdup(playerName)] = playerData;
+  sendMessageToClient(sock, "server: Welcome %s\n", playerName);
 }
 
 void GameServer::setFavouriteGame(PlayerData* myData, char* nameOfGame)
@@ -514,15 +515,15 @@ void GameServer::sendMessageToClient(int sock, const char* formatString, ...)
 
 void GameServer::sendGameDataToPlayers(GameData* gameData,
                                        bool showPlayerToMove,
-                                       char* lastMovePosition)
+                                       char* previousMovePosition)
 {
   // Show previous move for next player to move.
   char* playerToMove = gameData->getPlayerToMove();
   int playerToMoveSocket = getSocket(playerToMove);
-  if (lastMovePosition != NULL)
-    sendMessageToClient(playerToMoveSocket, "%s: play %s\n",
+  if (previousMovePosition != NULL)
+    sendMessageToClient(playerToMoveSocket, "%s: move %s\n",
                         gameData->getOtherPlayer(playerToMove),
-                        lastMovePosition);
+                        previousMovePosition);
 
   // Show resulting game board for both players.
   int player1Socket = getSocket(gameData->getPlayer1());

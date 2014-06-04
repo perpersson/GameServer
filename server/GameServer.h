@@ -39,7 +39,7 @@ class GameServer
   // Private helper methods.
   void sendMessageToClient(int sock, const char* formatString, ...);
   void sendGameDataToPlayers(GameData* gameData, bool showPlayerToMove,
-                             char* lastMovePosition);
+                             char* previousMovePosition);
 
   // Player related methods.
   bool playerExist(char* playerName);

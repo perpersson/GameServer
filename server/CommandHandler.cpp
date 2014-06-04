@@ -26,7 +26,7 @@ CommandHandler::CommandHandler()
   addCommand("recall <player>       Recall your challenge", RecallCommand, true);
   addCommand("accept <player>       Accept challenge from another player", AcceptCommand, true);
   addCommand("reject <player>       Reject challenge from another player", RejectCommand, true);
-  addCommand("play <move>           Make a move in the ongoing game", PlayCommand, true);
+  addCommand("move <position>       Make a move in the ongoing game", MoveCommand, true);
   addCommand("board                 Show board for ongoing game", BoardCommand, true);
   addCommand("resign                Give up current game", ResignCommand, true);
   addCommand("tell <player> <msg>   Send a message to player", TellCommand, true);
