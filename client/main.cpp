@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "GameClient.h"
+#include "HumanGameClient.h"
+#include "TicTacToeBot.h"
 
 int main(int argc, char* argv[])
 {
@@ -13,8 +14,18 @@ int main(int argc, char* argv[])
   const char* hostname = argv[1];
   int port = atoi(argv[2]);
   const char* name = (argc > 3 ? argv[3] : NULL);
-  const char* game = (argc > 4 ? argv[4] : NULL);
-  GameClient client(hostname, port, name, game);
-  client.mainLoop();
+
+  if (argc > 4)
+  {
+    const char* game = argv[4];
+    HumanGameClient client(hostname, port, name, game);
+    client.mainLoop();
+  }
+  else
+  {
+    TicTacToeBot client(hostname, port, name);
+    client.mainLoop();
+  }
+
   return 0;
 }

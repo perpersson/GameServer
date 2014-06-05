@@ -30,6 +30,7 @@ CommandHandler::CommandHandler()
   addCommand("board                 Show board for ongoing game", BoardCommand, true);
   addCommand("resign                Give up current game", ResignCommand, true);
   addCommand("tell <player> <msg>   Send a message to player", TellCommand, true);
+  addCommand("quit                  Disconnect from server", QuitCommand, false);
 
   // Add final help text.
   helpString += "\nCommand abbreviations are allowed when not ambigous\n";

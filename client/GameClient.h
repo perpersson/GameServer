@@ -1,24 +1,42 @@
 #ifndef GAME_CLIENT_H
 #define GAME_CLIENT_H
 
-#include "SocketClient.h"
+#include <stdlib.h>
+#include <sys/types.h>
 
-class GameClient : public SocketClient
+class GameClient
 {
  public:
   GameClient(const char* hostname, int port,
-             const char* name = NULL, const char* game = NULL);
+             const char* name, const char* game);
+
+  void mainLoop();
 
  protected:
-  // Overridden methods from base class.
-  virtual void onServerConnected();
-  virtual void onWaitForInput();
-  virtual void onStdinDataReceived(char* data, unsigned int dataLength);
-  virtual void onServerDataReceived(char* data, unsigned int dataLength);
+  // Methods to override in specific game clients subclasses.
+  virtual void onServerConnected() {}
+  virtual void onWaitForInput() {}
+  virtual void onStdinDataReceived(char* data) = 0;
+  virtual void onServerDataReceived(char* data) = 0;
+
+  // Helper methods to be used by subclasses.
+  void writeToServer(const char* formatString, ...);
 
  private:
+  void connectToServer(const char* hostname, int port);
+  void waitForInput(fd_set* read_fds, bool waitStdin,
+                    bool waitSocket, int timeoutInMilliSeconds = 0);
+
+  bool checkForStdinData(fd_set* read_fds);
+  bool checkForSocketData(fd_set* read_fds);
+
+  int sock;
+  const char* hostname;
+  int port;
   const char* name;
   const char* game;
+
+  bool disconnect;
 };
 
 #endif

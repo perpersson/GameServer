@@ -24,6 +24,7 @@ class GameServer
   void showChallenges(PlayerData* myData);
 
   void addPlayer(char* playerName, int sock, PlayerData*& playerData);
+  void removePlayer(PlayerData* myData);
   void setFavouriteGame(PlayerData* myData, char* game);
 
   void challengeOtherPlayer(PlayerData* myData, char* challengee);

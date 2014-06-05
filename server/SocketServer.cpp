@@ -77,4 +77,3 @@ void* SocketServer::clientThreadStart(void* clientThreadData)
   close(data->sock);
   return NULL;
 }
-

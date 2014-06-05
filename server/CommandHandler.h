@@ -32,7 +32,8 @@ enum Command
   ResignCommand,
 
   // Other commands
-  TellCommand
+  TellCommand,
+  QuitCommand
 };
 
 class CommandHandler

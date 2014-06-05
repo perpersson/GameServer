@@ -20,7 +20,9 @@ void GameServer::clientThreadMainLoop(int sock)
   PlayerData* playerData = NULL;   // Data for this client.
   char buffer[1024];
   char* dataAfterNewLine = NULL;
-  while (1)
+
+  Command command = UnknownCommand;
+  while (command != QuitCommand)
   {
     // Wait for socket input.
     if (dataAfterNewLine == NULL)
@@ -37,11 +39,11 @@ void GameServer::clientThreadMainLoop(int sock)
       strcpy(buffer, dataAfterNewLine);
 
     // Parse receved command from client.
-    printf("Got command from client: %s\n", buffer);
+    if (*buffer != '\0')
+      printf("Got command from client: %s\n", buffer);
     char* restOfLine;
-    Command command =
-      commandHandler->parseCommand(buffer, (playerData != NULL),
-                                   restOfLine, dataAfterNewLine);
+    command = commandHandler->parseCommand(buffer, (playerData != NULL),
+                                           restOfLine, dataAfterNewLine);
     commandMutex.lock();
     switch (command)
     {
@@ -82,6 +84,7 @@ void GameServer::clientThreadMainLoop(int sock)
         tellPlayer(playerData, otherPlayerName, message);
         break;
       }
+      case QuitCommand: removePlayer(playerData); break;
 
       default:
         sendMessageToClient(sock, "server: Unknown command '%s'", buffer);
@@ -180,6 +183,13 @@ void GameServer::addPlayer(char* playerName, int sock, PlayerData*& playerData)
     return;
   }
 
+  // Avoid illegal name server.
+  if (strncmp(playerName, "server", 6) == 0)
+  {
+    sendMessageToClient(sock, "server: Pick another name. I'm the server");
+    return;
+  }
+
   if (playerExist(playerName))
   {
     sendMessageToClient(sock, "server: Player %s already exists", playerName);
@@ -190,6 +200,38 @@ void GameServer::addPlayer(char* playerName, int sock, PlayerData*& playerData)
   playerData = new PlayerData(playerName, sock);
   players[strdup(playerName)] = playerData;
   sendMessageToClient(sock, "server: Welcome %s\n", playerName);
+}
+
+void GameServer::removePlayer(PlayerData* myData)
+{
+  if (myData != NULL)
+  {
+    char* playerName = myData->getPlayerName();
+
+    // Do automatic resign if we're playing a game.
+    if (myData->getOngoingGame() != NULL)
+      resignGame(myData);
+
+    // Do automatic recall if we've sent a challenge to someone.
+    auto challengeIterator = challenges.find(playerName);
+    if (challengeIterator != challenges.end())
+    {
+      sendMessageToClient(myData->getSocket(),
+                          "server: Recalling your challenge to %s\n",
+                          challengeIterator->second->getChallengee());
+      recallChallenge(myData, challengeIterator->second->getChallengee());
+    }
+
+    // Say goodbye.
+    sendMessageToClient(myData->getSocket(), "server: Goodbye %s", playerName);
+
+    // Delete all player data.
+    auto playerIterator = players.find(playerName);
+    char* name = playerIterator->first;
+    players.erase(playerIterator);
+    free(name);
+    delete myData;
+  }
 }
 
 void GameServer::setFavouriteGame(PlayerData* myData, char* nameOfGame)
@@ -476,7 +518,7 @@ void GameServer::resignGame(PlayerData* myData)
   char* opponentName = gameData->getOtherPlayer(myName);
   PlayerData* opponentData = getPlayerData(opponentName);
   sendMessageToClient(opponentData->getSocket(),
-                      "%s: I resign. You win.", myName);
+                      "server: %s resigned. You win.", myName);
 
   // Delete all GameData.
   myData->clearOngoingGame();
@@ -521,7 +563,7 @@ void GameServer::sendGameDataToPlayers(GameData* gameData,
   char* playerToMove = gameData->getPlayerToMove();
   int playerToMoveSocket = getSocket(playerToMove);
   if (previousMovePosition != NULL)
-    sendMessageToClient(playerToMoveSocket, "%s: move %s\n",
+    sendMessageToClient(playerToMoveSocket, "server: move by %s: %s\n",
                         gameData->getOtherPlayer(playerToMove),
                         previousMovePosition);
 
