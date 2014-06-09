@@ -15,6 +15,7 @@ class TicTacToeBoard : public GameBoard
   virtual bool makeMove(char* position);  // Returns true if move is legal.
   virtual bool isGameOver() const;
   virtual int getPlayer1Result() const;
+  virtual char* getPossibleMovesString() const;
   virtual char* getBoardAsString() const;
 
  private:

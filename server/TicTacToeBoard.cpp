@@ -65,6 +65,26 @@ int TicTacToeBoard::getPlayer1Result() const
   return 0;   // It's a draw.
 }
 
+char* TicTacToeBoard::getPossibleMovesString() const
+{
+  char possibleMovesString[3*9+1];
+  int stringPos = 0;
+  for (unsigned int position=0; position<9; ++position)
+  {
+    unsigned int positionBit = 1 << position;
+    if (((player1 | player2) & positionBit) == 0)
+    {
+      int column = position % 3;
+      int row = position / 3;
+      possibleMovesString[stringPos++] = column + 'A';
+      possibleMovesString[stringPos++] = row + '1';
+      possibleMovesString[stringPos++] = ' ';
+    }
+  }
+  possibleMovesString[stringPos - !!stringPos] = '\0';
+  return strdup(possibleMovesString);
+}
+
 char* TicTacToeBoard::getBoardAsString() const
 {
   const char* emptyBoardString =
@@ -73,17 +93,17 @@ char* TicTacToeBoard::getBoardAsString() const
   const int stringIndex[] = {23, 25, 27, 43, 45, 47, 63, 65, 67};
 
   char* boardString = strdup(emptyBoardString);
-  for (unsigned int i=0; i<9; ++i)
+  for (unsigned int position=0; position<9; ++position)
   {
-    unsigned int position = 1 << i;
+    unsigned int positionBit = 1 << position;
     char c;
-    if ((player1 & position) != 0)
+    if ((player1 & positionBit) != 0)
       c = 'X';
-    else if ((player2 & position) != 0)
+    else if ((player2 & positionBit) != 0)
       c = 'O';
     else
       c = ' ';
-    boardString[stringIndex[i]] = c;
+    boardString[stringIndex[position]] = c;
   }
   return boardString;
 }

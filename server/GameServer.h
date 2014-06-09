@@ -13,6 +13,7 @@ class GameServer
 {
  public:
   GameServer();
+  ~GameServer();
 
   void clientThreadMainLoop(int sock);
 

@@ -2,7 +2,7 @@
 #include "GameBoardFactory.h"
 #include "TicTacToeBoard.h"
 #include "Connect4Board.h"
-//#include "OthelloBoard.h"
+#include "OthelloBoard.h"
 
 using namespace std;
 
@@ -13,7 +13,7 @@ GameBoardFactory::GameBoardFactory()
   // Create game boards for all known games.
   gameBoards["tictactoe"] = new TicTacToeBoard();
   gameBoards["connect4"] = new Connect4Board();
-//  gameBoards["othello"] = new OthelloBoard();
+  gameBoards["othello"] = new OthelloBoard();
 
   // Build game list string.
   for (auto iter=gameBoards.begin(); iter!=gameBoards.end(); ++iter)

@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -77,7 +78,7 @@ void GameClient::connectToServer(const char* hostname, int port)
     exit(1);
   }
 
-  // Send name and game to server  if given.
+  // Send name and game to server if given.
   char buffer[1024];
   if (name != NULL)
   {
@@ -130,14 +131,9 @@ bool GameClient::checkForSocketData(fd_set* read_fds)
   if (FD_ISSET(sock, read_fds))
   {
     char buffer[8192] = {0};
-    int n = read(sock, buffer, sizeof(buffer) - 1);
-    if (n < 0)
-    {
-      perror("ERROR reading from socket");
-      exit(1);
-    }
-
-    if (n > 0)
+    if (read(sock, buffer, sizeof(buffer) - 1) == 0)
+      disconnect = true;
+    else
     {
       char* allData = buffer;
       while (allData != NULL && *allData != '\0')

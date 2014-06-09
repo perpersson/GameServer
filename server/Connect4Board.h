@@ -15,6 +15,7 @@ class Connect4Board : public GameBoard
   virtual bool makeMove(char* position);  // Returns true if move is legal.
   virtual bool isGameOver() const;
   virtual int getPlayer1Result() const;
+  virtual char* getPossibleMovesString() const;
   virtual char* getBoardAsString() const;
 
  private:
@@ -31,7 +32,7 @@ class Connect4Board : public GameBoard
   int getIndexFromRowAndColumn(int row, int column) const
   { return row * 7 + column; }
 
-  bool isWinLine(unsigned int startIndex, unsigned int step,
+  bool isWinLine(unsigned int startIndex, int dx, int dy,
                  int& result) const;
 };
 

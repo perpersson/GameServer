@@ -13,6 +13,7 @@ class GameBoard
   virtual bool makeMove(char* position) = 0;  // Returns true if move is legal.
   virtual bool isGameOver() const = 0;
   virtual int getPlayer1Result() const = 0;
+  virtual char* getPossibleMovesString() const = 0;
   virtual char* getBoardAsString() const = 0;
 };
 

@@ -13,6 +13,7 @@ class GameBoardFactory
 {
  public:
   static GameBoardFactory* getInstance();
+  ~GameBoardFactory();
 
   const char* getGameList();
   const char* getFullNameOfGame(const char* nameOfGameStart);
@@ -20,7 +21,6 @@ class GameBoardFactory
 
  private:
   GameBoardFactory();
-  ~GameBoardFactory();
 
   static GameBoardFactory* instance;
 
